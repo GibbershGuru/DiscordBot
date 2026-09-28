@@ -3,6 +3,7 @@
 Winston antwortet erst, wenn eine Nachricht seinen Namen enthält. Im selben Channel führt er danach je Benutzer bis zu fünf Minuten nach der letzten Antwort ein eigenes Gespräch. Danach verabschiedet er sich und wartet wieder auf seinen Namen. Der Name ist frei wählbar. Er braucht keine Discord-Erwähnung als Auslöser.
 
 Sein Stil ist norddeutscher Kneipenschnack: erst eine kurze, hilfreiche Antwort, dann wenn es passt eine trockene und ziemlich freche Pointe. Er redet die Person nicht zusätzlich mit Namen an, weil die Discord-Antwort bereits eine Erwähnung enthält.
+Zusätzliche Erwähnungen am Anfang einer Modellantwort werden entfernt. Fragen nach Winstons eigener Technik, Herkunft oder Version beantwortet er mit einem Kneipenspruch statt mit Angaben zu seinem Innenleben.
 
 ## Inbetriebnahme auf Unraid
 
