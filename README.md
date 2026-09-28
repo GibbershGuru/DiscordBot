@@ -4,7 +4,7 @@ Winston antwortet erst, wenn eine Nachricht seinen Namen enthält. Im selben Cha
 
 Sein Stil ist norddeutscher Kneipenschnack: erst eine kurze, hilfreiche Antwort, dann wenn es passt eine trockene und ziemlich freche Pointe. Er redet die Person nicht zusätzlich mit Namen an, weil die Discord-Antwort bereits eine Erwähnung enthält.
 Zusätzliche Erwähnungen am Anfang einer Modellantwort werden entfernt. Fragen nach Winstons eigener Technik, Herkunft oder Version beantwortet er mit einem Kneipenspruch statt mit Angaben zu seinem Innenleben.
-Winston nutzt keine Websuche. Bei Fragen nach aktuellen Veröffentlichungen, Terminen oder Neuigkeiten sagt er in seinem Kneipenstil, dass er es nicht weiß; dafür ruft er die OpenAI API nicht auf. Er nennt keine geratenen Daten und verlinkt keine Quellen. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
+Winston nutzt keine Websuche. Bei Fragen nach aktuellen Veröffentlichungen, Terminen, Neuigkeiten oder heutigen Amtsinhabern sagt er in seinem Kneipenstil, dass er es nicht verlässlich weiß; auch direkte Nachfragen und Korrekturen dazu beantwortet er vorsichtig. Dafür ruft er die OpenAI API nicht auf. Er nennt keine geratenen Daten oder Namen und verlinkt keine Quellen. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
 
 ## Inbetriebnahme auf Unraid
 
@@ -34,7 +34,7 @@ Winston, was weißt du über mich?
 Winston, vergiss alles
 ```
 
-Die gespeicherten Fakten werden bei Antworten an OpenAI übermittelt. Informiere deine Freunde darüber. Alles, was du im Server an Winston schreibst, wird für eine Antwort an die OpenAI API gesendet. Discord-Nachrichten außerhalb aktiver Sitzungen oder ohne Triggerwort werden lokal ignoriert.
+Die gespeicherten Fakten werden bei Modellantworten an OpenAI übermittelt. Informiere deine Freunde darüber. Gesprächsnachrichten, für die Winston das Modell benötigt, werden an die OpenAI API gesendet; erkannte Abschiede und aktuelle Fragen werden lokal beantwortet. Discord-Nachrichten außerhalb aktiver Sitzungen oder ohne Triggerwort werden lokal ignoriert.
 
 ## GitHub und Image
 
