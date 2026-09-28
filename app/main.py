@@ -5,6 +5,7 @@ import os
 import random
 import re
 import time
+from urllib.parse import urlparse
 
 import asyncpg
 import discord
@@ -72,23 +73,39 @@ def needs_web_search(question):
     """Only pay for a search when the question is explicitly current or asks for research."""
     return bool(re.search(
         r"\b(?:recherchier\w*|such\s+(?:im\s+)?(?:web|internet|online)|google\w*|"
-        r"aktuell\w*|neueste\w*|heute|gestern|morgen|release(?:datum)?|"
+        r"aktuell\w*|neueste\w*|heute|gestern|morgen|release(?:datum)?|termin\w*|"
+        r"(?:was|gibt|gibts).*\bneues\b|"
         r"erschein\w*|veröffentlich\w*|wann\s+(?:kommt|erscheint|startet|beginnt)|"
         r"wann\s+ist\s+(?:der|die|das)\s+(?:release|start|veröffentlichung)|"
-        r"wann\s+[^?!.]{0,80}\b(?:raus|verfügbar|spielbar)\b|"
+        r"wann\s+[^?!.]{0,80}\b(?:kommt|raus|verfügbar|spielbar)\b|"
         r"angekündigt|neuigkeiten|news)\b", question, re.IGNORECASE
     ))
 
 
-def cited_sources(response):
+def official_domains(question, history):
+    """For known games, search the publisher rather than unaffiliated date sites."""
+    previous = next((entry["content"] for entry in reversed(history)
+                     if entry["role"] == "user" and re.search(r"\b(?:wow|world of warcraft|enshrouded)\b", entry["content"], re.IGNORECASE)), "")
+    subject = question if re.search(r"\b(?:wow|world of warcraft|enshrouded)\b", question, re.IGNORECASE) else previous
+    if re.search(r"\b(?:wow|world of warcraft)\b", subject, re.IGNORECASE):
+        return ["worldofwarcraft.blizzard.com", "news.blizzard.com"]
+    if re.search(r"\benshrouded\b", subject, re.IGNORECASE):
+        return ["enshrouded.com", "keengames.com"]
+    return []
+
+
+def cited_sources(response, domains=()):
     urls = []
     for item in response.output:
         for part in getattr(item, "content", []):
             for annotation in getattr(part, "annotations", []):
                 url = getattr(annotation, "url", None)
-                if getattr(annotation, "type", None) == "url_citation" and url and url.startswith(("https://", "http://")) and len(url) <= 350 and url not in urls:
+                host = urlparse(url).hostname if url else None
+                if (getattr(annotation, "type", None) == "url_citation" and url and url.startswith("https://")
+                    and len(url) <= 350 and url not in urls
+                    and (not domains or (host and any(host == domain or host.endswith("." + domain) for domain in domains)))):
                     urls.append(url)
-    return urls[:2]
+    return urls[:1]
 
 
 class Winston(discord.Client):
@@ -180,27 +197,37 @@ class Winston(discord.Client):
             )
             if is_identity_question(question):
                 answer = random.choice(IDENTITY_ANSWERS)
+            elif needs_web_search(question) and not WEB_SEARCH:
+                answer = "Aktuelle Termine kann ich ohne Websuche nicht prüfen. Da halt ich lieber die Klappe, bevor ich dir Quatsch auftische."
             else:
                 try:
                     search = WEB_SEARCH and needs_web_search(question)
+                    domains = official_domains(question, history) if search else []
+                    search_instructions = (
+                        " Für diese Recherche: Antworte nur mit der wichtigsten belegten Information in einem kurzen Satz, ohne Pointe. "
+                        "Bevorzuge die offizielle Mitteilung des Entwicklers oder Herausgebers; keine Gerüchte, erfundenen Termine oder Nebendetails. "
+                        "Vermeide Quellennamen und Links im Fließtext, ein Quellenlink wird separat angehängt. "
+                    ) if search else ""
                     async with message.channel.typing():
                         response = await self.ai.responses.create(
-                            model=MODEL, instructions=instructions,
+                            model=MODEL, instructions=instructions + search_instructions,
                             input=history + [{"role": "user", "content": question[:1500]}],
                             max_output_tokens=max(240, OUTPUT_TOKENS) if search else OUTPUT_TOKENS,
                             store=False, timeout=60.0 if search else 30.0,
-                            **({"tools": [{"type": "web_search", "search_context_size": "low"}],
+                            **({"tools": [{"type": "web_search", "search_context_size": "low",
+                                           **({"filters": {"allowed_domains": domains}} if domains else {})}],
                                 "tool_choice": "required"} if search else {}),
                         )
                     answer = without_repeated_name(response.output_text.strip()[:1500], message.author)
                     if search:
-                        sources = cited_sources(response)
+                        sources = cited_sources(response, domains)
                         if sources:
                             answer = re.sub(r"cite.*?", "", answer).strip()
-                            links = " · ".join(f"Quelle {n}: <{url}>" for n, url in enumerate(sources, 1))
+                            answer = re.sub(r"\s*\([a-z0-9-]+(?:\.[a-z0-9-]+)+(?:/[^)]*)?\)", "", answer, flags=re.IGNORECASE)
+                            links = f"Quelle: <{sources[0]}>"
                             answer = f"{answer[:1900 - len(links) - 1]}\n{links}"
                         else:
-                            answer = "Dazu finde ich gerade keine belastbare Quelle. Frag später noch mal nach."
+                            answer = "Dazu finde ich gerade keine belastbare offizielle Quelle. Ich würd dir sonst bloß was vom Pferd erzählen."
                     if re.search(r"\b(?:ich|mich|mein\w*)\b", answer, re.IGNORECASE) and re.search(
                         r"\b(?:openai|chatgpt|gpt(?:[- ]?\d[\w.-]*)?|sprachmodell|ki-modell|api)\b", answer, re.IGNORECASE
                     ):
