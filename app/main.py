@@ -207,6 +207,7 @@ class Winston(discord.Client):
                         " Für diese Recherche: Antworte nur mit der wichtigsten belegten Information in einem kurzen Satz, ohne Pointe. "
                         "Bevorzuge die offizielle Mitteilung des Entwicklers oder Herausgebers; keine Gerüchte, erfundenen Termine oder Nebendetails. "
                         "Vermeide Quellennamen und Links im Fließtext, ein Quellenlink wird separat angehängt. "
+                        + (" Nutze für die belegte Antwort eine offizielle Quelle aus diesen Domains: " + ", ".join(domains) + ". " if domains else "")
                     ) if search else ""
                     async with message.channel.typing():
                         response = await self.ai.responses.create(
@@ -214,8 +215,7 @@ class Winston(discord.Client):
                             input=history + [{"role": "user", "content": question[:1500]}],
                             max_output_tokens=max(240, OUTPUT_TOKENS) if search else OUTPUT_TOKENS,
                             store=False, timeout=60.0 if search else 30.0,
-                            **({"tools": [{"type": "web_search", "search_context_size": "low",
-                                           **({"filters": {"allowed_domains": domains}} if domains else {})}],
+                            **({"tools": [{"type": "web_search", "search_context_size": "low"}],
                                 "tool_choice": "required"} if search else {}),
                         )
                     answer = without_repeated_name(response.output_text.strip()[:1500], message.author)
