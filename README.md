@@ -4,6 +4,7 @@ Winston antwortet erst, wenn eine Nachricht seinen Namen enthält. Im selben Cha
 
 Sein Stil ist norddeutscher Kneipenschnack: erst eine kurze, hilfreiche Antwort, dann wenn es passt eine trockene und ziemlich freche Pointe. Er redet die Person nicht zusätzlich mit Namen an, weil die Discord-Antwort bereits eine Erwähnung enthält.
 Zusätzliche Erwähnungen am Anfang einer Modellantwort werden entfernt. Fragen nach Winstons eigener Technik, Herkunft oder Version beantwortet er mit einem Kneipenspruch statt mit Angaben zu seinem Innenleben.
+Bei aktuellen Fragen wie „Wann erscheint Enshrouded 1.0?“ oder einer ausdrücklichen Bitte um Recherche nutzt Winston die Websuche und verlinkt Quellen in Discord. Ohne belegte Quelle nennt er keinen vermeintlichen Termin. Die Websuche ist standardmäßig aktiv und kann mit `WEB_SEARCH=false` deaktiviert werden. Suchanfragen kosten zusätzlich Geld und können länger dauern; ohne Suche kennt der Bot keine Live-Termine. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
 
 ## Inbetriebnahme auf Unraid
 
@@ -52,6 +53,6 @@ docker compose up --build -d
 docker compose logs -f bot
 ```
 
-Konfiguration: `BOT_NAME` (Trigger), `OPENAI_MODEL` (Standard `gpt-4.1-mini`), `MAX_OUTPUT_TOKENS` (Standard 120), `SESSION_SECONDS` (Standard 300), `DISCORD_TOKEN`, `OPENAI_API_KEY`, `POSTGRES_PASSWORD`. Der Token-Deckel begrenzt die *Ausgabe je Anfrage*, nicht die gesamten API-Ausgaben. Keine automatische Kostengarantie: Setze zusätzlich ein Budget im OpenAI Dashboard.
+Konfiguration: `BOT_NAME` (Trigger), `OPENAI_MODEL` (Standard `gpt-4.1-mini`), `MAX_OUTPUT_TOKENS` (Standard 120; bei Suche mindestens 240), `SESSION_SECONDS` (Standard 300), `WEB_SEARCH` (Standard `true`), `DISCORD_TOKEN`, `OPENAI_API_KEY`, `POSTGRES_PASSWORD`. Der Token-Deckel begrenzt die *Ausgabe je Anfrage*, nicht die gesamten API-Ausgaben. Keine automatische Kostengarantie: Setze zusätzlich ein Budget im OpenAI Dashboard. Bei Unraid „Add Container“ `WEB_SEARCH` als Umgebungsvariable eintragen, wenn du die Suche abschalten willst; andernfalls ist keine neue Variable nötig.
 
 Lizenz: MIT (siehe `LICENSE`).
