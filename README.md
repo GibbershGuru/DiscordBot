@@ -5,7 +5,8 @@ Ein Discord-Bot mit frei wählbarem Namen und norddeutschem Kneipenhumor. Das fe
 ## Funktionen
 
 - Reagiert auf seinen Namen (`BOT_NAME`) und unterhält sich danach pro Person und Kanal bis zu fünf Minuten ohne erneutes Aufrufen.
-- Antwortet kurz und frech; verabschiedet sich nach Inaktivität oder sofort bei „Tschüss“.
+- Antwortet kurz, trocken und gelegentlich arrogant; variiert Begrüßungen und kurze Abschiede.
+- Begrüßt neue Mitglieder auf Wunsch in einem festgelegten Kanal mit einem zufälligen Spruch.
 - Merkt sich Fakten nur auf ausdrücklichen Befehl: `merk dir: ...`, `was weißt du über mich?`, `vergiss alles`.
 - Nutzt keine Websuche. Bei erkannten Fragen nach aktuellen Fakten sagt er „Weiß ich nicht sicher.“; auch sonst soll er Wissenslücken zugeben. Modellantworten können trotzdem Fehler enthalten.
 
@@ -17,6 +18,8 @@ Ein Discord-Bot mit frei wählbarem Namen und norddeutschem Kneipenhumor. Das fe
 4. Starte `docker compose up -d`. Für Updates: `docker compose pull && docker compose up -d`.
 
 `compose.yaml` startet den Bot mit PostgreSQL für ausdrücklich gespeicherte Erinnerungen und Redis für laufende Gespräche. Sichere das PostgreSQL-Volume regelmäßig. Du kannst den Bot auch über Docker-Oberflächen wie Unraid als einzelnen Container starten; dann benötigt er zusätzlich `DATABASE_URL` und `REDIS_URL` für erreichbare PostgreSQL- und Redis-Dienste. Alle Einstellungen lassen sich als Umgebungsvariablen übergeben, eine `.env`-Datei ist dabei nicht nötig.
+
+Für automatische Begrüßungen: Im Discord Developer Portal zusätzlich **Server Members Intent** aktivieren und `WELCOME_CHANNEL_ID` auf die ID des gewünschten Textkanals setzen. Der Bot braucht dort **Kanal anzeigen** und **Nachrichten senden**. `WELCOME_CHANNEL_ID=0` (Standard) deaktiviert die Funktion; dann ist der zusätzliche Intent nicht erforderlich. Ein erneutes Einladen des Bots ist nicht nötig.
 
 Nachrichten, die der Bot mit dem Sprachmodell beantwortet, und gespeicherte Fakten werden an die OpenAI API übertragen. Teile das den Personen auf deinem Server mit. Veröffentliche niemals Token, API-Schlüssel oder `.env` im Repository.
 
