@@ -1,6 +1,7 @@
 """Parse a small, predictable set of German reminder commands without a model call."""
 
 import re
+import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -29,6 +30,40 @@ def clock_reply(text):
     return f"um {hour:02d}:{minute:02d} Uhr" if hour < 24 and minute < 60 else None
 
 
+def clean_reminder_text(text):
+    """Keep the actual task, including when an older reminder stored a rough phrase."""
+    text = text.strip(" ,.!?\n")
+    text = re.sub(r"^(?:daran|dran|an)\b[\s,:]*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^(?:dass|das)\b[\s,:]*", "", text, flags=re.IGNORECASE)
+    # Colloquial commands sometimes append an explanation without punctuation:
+    # "ich duschen muss ich stinke" -> "duschen".
+    text = re.sub(r"^ich\s+(.+?)\s+(?:muss|soll|sollte)(?:\s+ich\s+.*)?$", r"\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"^(.+?)\s+(?:muss|soll|sollte)\s+ich\s+.*$", r"\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"^ich\s+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^(.+?)\s+dann\s+vorbei\s+ist$", r"\1 ist vorbei", text, flags=re.IGNORECASE)
+    return text.strip(" ,.!?\n")
+
+
+def reminder_message(text):
+    """Write one short reminder in the bot's voice without a model request."""
+    task = clean_reminder_text(text)
+    if task.casefold() == "duschen":
+        return "Zeit zum Duschen. Die Seife wartet schon, du Stinktier."
+    task = re.sub(r"^meine\b", "deine", task, flags=re.IGNORECASE)
+    task = re.sub(r"^meinen\b", "deinen", task, flags=re.IGNORECASE)
+    if re.search(r"\b(?:ist|sind|hat|haben)\b", task, re.IGNORECASE):
+        sentence = task[:1].upper() + task[1:]
+    elif re.search(r"\b\w+(?:en|eln|ern)\s*$", task, re.IGNORECASE) or task.lower().startswith("zum "):
+        sentence = "Du wolltest " + task
+    else:
+        sentence = "Denk dran: " + task[:1].lower() + task[1:]
+    return sentence.rstrip(".!?") + ". " + random.choice([
+        "Nu mach hin, du Pfeife.",
+        "Ich hab Bescheid gesagt. Der Rest liegt bei dir.",
+        "Mehr Service gibt's hier nur gegen Trinkgeld.",
+    ])
+
+
 def parse_reminder(question, tz, now=None):
     match = COMMAND.fullmatch(question.strip())
     if not match:
@@ -43,11 +78,7 @@ def parse_reminder(question, tz, now=None):
     text = body
     for start, end in sorted(spans, reverse=True):
         text = text[:start] + text[end:]
-    text = re.sub(r"^(?:daran|dran|an)\b[\s,:]*", "", text.strip(), flags=re.IGNORECASE)
-    text = re.sub(r"^(?:dass|das)\b[\s,:]*", "", text, flags=re.IGNORECASE).strip(" ,.!?\n")
-    text = re.sub(r"^ich\s+(.+?)\s+(?:muss|soll|sollte)$", r"\1", text, flags=re.IGNORECASE)
-    text = re.sub(r"^ich\s+", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"^(.+?)\s+dann\s+vorbei\s+ist$", r"\1 ist vorbei", text, flags=re.IGNORECASE)
+    text = clean_reminder_text(text)
     if not text:
         return Reminder(error="Woran soll ich dich erinnern? Sag's noch mal mit dem Anlass dazu.")
     if len(text) > 200:
