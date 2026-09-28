@@ -11,7 +11,7 @@ import asyncpg
 import discord
 from openai import AsyncOpenAI
 from redis.asyncio import Redis
-from .reminders import clock_reply, parse_reminder
+from .reminders import clean_reminder_text, clock_reply, parse_reminder, reminder_message
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("winston")
@@ -284,7 +284,7 @@ class Winston(discord.Client):
                 rows = await conn.fetch("""SELECT id, reminder_text, due_at FROM reminders
                     WHERE guild_id=$1 AND user_id=$2 AND status='pending' ORDER BY due_at LIMIT 10""",
                                         message.guild.id, message.author.id)
-            lines = [f"#{row['id']} · {row['due_at'].astimezone(REMINDER_TZ):%d.%m.%Y %H:%M} · {row['reminder_text']}" for row in rows]
+            lines = [f"#{row['id']} · {row['due_at'].astimezone(REMINDER_TZ):%d.%m.%Y %H:%M} · {clean_reminder_text(row['reminder_text'])}" for row in rows]
             await self.reply(message, "Keine Erinnerungen offen." if not lines else "Deine Erinnerungen:\n" + "\n".join(lines))
             return True
         deletion = re.fullmatch(r"(?i)(?:lösche|loesche|streiche|entferne)\s+erinnerung\s*#?(\d+)[.!?]*", question)
@@ -349,7 +349,7 @@ class Winston(discord.Client):
                                 await conn.execute("UPDATE reminders SET status='failed' WHERE id=$1", row["id"])
                                 continue
                             try:
-                                await channel.send(f"<@{row['user_id']}> Erinnerung: {row['reminder_text']}",
+                                await channel.send(f"<@{row['user_id']}> {reminder_message(row['reminder_text'])}",
                                                    allowed_mentions=discord.AllowedMentions(users=[discord.Object(id=row['user_id'])]))
                             except discord.Forbidden:
                                 log.exception("No permission to deliver reminder %s", row["id"])
