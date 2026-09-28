@@ -2,6 +2,8 @@
 
 Winston antwortet erst, wenn eine Nachricht seinen Namen enthält. Im selben Channel führt er danach je Benutzer bis zu fünf Minuten nach der letzten Antwort ein eigenes Gespräch. Danach verabschiedet er sich und wartet wieder auf seinen Namen. Der Name ist frei wählbar. Er braucht keine Discord-Erwähnung als Auslöser.
 
+Sein Stil ist norddeutscher Kneipenschnack: erst eine kurze, hilfreiche Antwort, dann wenn es passt eine trockene und ziemlich freche Pointe. Er redet die Person nicht zusätzlich mit Namen an, weil die Discord-Antwort bereits eine Erwähnung enthält.
+
 ## Inbetriebnahme auf Unraid
 
 1. Erstelle im [Discord Developer Portal](https://discord.com/developers/applications) eine eigene Anwendung mit Bot, aktiviere unter **Bot → Privileged Gateway Intents** den **Message Content Intent**. Wähle im OAuth2-URL-Generator nur den Scope **bot** und die Berechtigungen **Kanal anzeigen** (View Channels), **Nachrichten senden** (Send Messages) und **Nachrichtenverlauf lesen** (Read Message History). **Administrator**, **Links einbetten** und `applications.commands` benötigt die aktuelle Version nicht. Im Portal legst du auch den sichtbaren Benutzernamen fest; `BOT_NAME` unten bestimmt das gesuchte Triggerwort und die Persönlichkeit. Setze beides gleich.
