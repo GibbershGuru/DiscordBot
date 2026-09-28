@@ -5,11 +5,13 @@ import os
 import random
 import re
 import time
+from zoneinfo import ZoneInfo
 
 import asyncpg
 import discord
 from openai import AsyncOpenAI
 from redis.asyncio import Redis
+from .reminders import clock_reply, parse_reminder
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("winston")
@@ -21,6 +23,7 @@ TRIGGER = re.compile(r"(?<!\w)" + re.escape(NAME) + r"(?!\w)", re.IGNORECASE)
 TIMEOUT = max(30, int(os.getenv("SESSION_SECONDS", "300")))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 OUTPUT_TOKENS = max(32, min(300, int(os.getenv("MAX_OUTPUT_TOKENS", "120"))))
+REMINDER_TZ = ZoneInfo(os.getenv("REMINDER_TIMEZONE", "Europe/Berlin"))
 WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID", "0").strip() or "0")
 if WELCOME_CHANNEL_ID < 0:
     raise ValueError("WELCOME_CHANNEL_ID must be a positive channel ID or 0 to disable welcomes")
@@ -132,6 +135,7 @@ class Winston(discord.Client):
         self.db = None
         self.locks = {}
         self.sweeper = None
+        self.reminder_task = None
 
     async def setup_hook(self):
         self.db = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=3)
@@ -141,11 +145,23 @@ class Winston(discord.Client):
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 PRIMARY KEY (guild_id, user_id, fact)
             )""")
+            await conn.execute("""CREATE TABLE IF NOT EXISTS reminders (
+                id BIGSERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL, channel_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+                reminder_text TEXT NOT NULL, due_at TIMESTAMPTZ NOT NULL,
+                next_attempt_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(), delivered_at TIMESTAMPTZ
+            )""")
+            await conn.execute("CREATE INDEX IF NOT EXISTS reminders_due_idx ON reminders (next_attempt_at) WHERE status='pending'")
         self.sweeper = asyncio.create_task(self.expire_sessions())
+        self.reminder_task = asyncio.create_task(self.deliver_reminders())
 
     async def close(self):
-        if self.sweeper:
-            self.sweeper.cancel()
+        tasks = [task for task in (self.sweeper, self.reminder_task) if task]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         await super().close()
         await self.redis.aclose()
         if self.db:
@@ -154,6 +170,14 @@ class Winston(discord.Client):
     @staticmethod
     def key(message):
         return f"session:{message.guild.id}:{message.channel.id}:{message.author.id}"
+
+    async def save_session(self, message, key, history, current_topic=None, pending_reminder=None):
+        deadline = time.time() + TIMEOUT
+        data = {"history": history, "deadline": deadline, "current_topic": current_topic,
+                "pending_reminder": pending_reminder, "guild": message.guild.id,
+                "channel": message.channel.id, "user": message.author.id}
+        await self.redis.set(key, json.dumps(data), ex=TIMEOUT + 120)
+        await self.redis.zadd("session_deadlines", {key: deadline})
 
     async def on_member_join(self, member):
         if not WELCOME_CHANNEL_ID or member.bot:
@@ -195,12 +219,11 @@ class Winston(discord.Client):
                 return
             if not question:
                 await self.reply(message, random.choice(GREETINGS))
-                deadline = time.time() + TIMEOUT
-                data = {"history": session["history"] if session else [], "deadline": deadline,
-                        "current_topic": session.get("current_topic") if session else None,
-                        "guild": message.guild.id, "channel": message.channel.id, "user": message.author.id}
-                await self.redis.set(key, json.dumps(data), ex=TIMEOUT + 120)
-                await self.redis.zadd("session_deadlines", {key: deadline})
+                await self.save_session(message, key, session["history"] if session else [],
+                                        session.get("current_topic") if session else None,
+                                        session.get("pending_reminder") if session else None)
+                return
+            if await self.reminder_command(message, question, key, session):
                 return
             if await self.memory_command(message, question):
                 return
@@ -251,12 +274,96 @@ class Winston(discord.Client):
                     return
             await self.reply(message, answer)
             history = (history + [{"role": "user", "content": question[:1500]}, {"role": "assistant", "content": answer}])[-8:]
-            deadline = time.time() + TIMEOUT
-            data = {"history": history, "deadline": deadline,
-                    "current_topic": current_topic,
-                    "guild": message.guild.id, "channel": message.channel.id, "user": message.author.id}
-            await self.redis.set(key, json.dumps(data), ex=TIMEOUT + 120)
-            await self.redis.zadd("session_deadlines", {key: deadline})
+            await self.save_session(message, key, history, current_topic)
+
+    async def reminder_command(self, message, question, key, session):
+        history = session["history"] if session else []
+        current_topic = session.get("current_topic") if session else None
+        if re.fullmatch(r"(?i)(?:meine erinnerungen|zeig(?:e)? (?:mir )?meine erinnerungen)[.!?]*", question):
+            async with self.db.acquire() as conn:
+                rows = await conn.fetch("""SELECT id, reminder_text, due_at FROM reminders
+                    WHERE guild_id=$1 AND user_id=$2 AND status='pending' ORDER BY due_at LIMIT 10""",
+                                        message.guild.id, message.author.id)
+            lines = [f"#{row['id']} · {row['due_at'].astimezone(REMINDER_TZ):%d.%m.%Y %H:%M} · {row['reminder_text']}" for row in rows]
+            await self.reply(message, "Keine Erinnerungen offen." if not lines else "Deine Erinnerungen:\n" + "\n".join(lines))
+            return True
+        deletion = re.fullmatch(r"(?i)(?:lösche|loesche|streiche|entferne)\s+erinnerung\s*#?(\d+)[.!?]*", question)
+        if deletion:
+            async with self.db.acquire() as conn:
+                result = await conn.execute("""UPDATE reminders SET status='cancelled' WHERE id=$1 AND guild_id=$2
+                    AND user_id=$3 AND status='pending'""", int(deletion[1]), message.guild.id, message.author.id)
+            await self.reply(message, "Erinnerung gelöscht." if result == "UPDATE 1" else "Die Erinnerung finde ich nicht.")
+            return True
+        pending = session.get("pending_reminder") if session else None
+        if pending and not re.match(r"(?i)^(?:erinnere|erinner)\s+mich\b", question):
+            if re.fullmatch(r"(?i)abbrechen[.!?]*", question):
+                await self.reply(message, "Alles klar, gestrichen.")
+                await self.save_session(message, key, history, current_topic)
+                return True
+            clock = clock_reply(question)
+            if clock is None:
+                await self.reply(message, "Welche Uhrzeit? Schreib zum Beispiel '18 Uhr' oder 'abbrechen'.")
+                await self.save_session(message, key, history, current_topic, pending)
+                return True
+            question = pending + " " + clock
+        parsed = parse_reminder(question, REMINDER_TZ)
+        if parsed is None:
+            return False
+        if parsed.error:
+            await self.reply(message, parsed.error)
+            await self.save_session(message, key, history, current_topic)
+            return True
+        if parsed.needs_time:
+            await self.reply(message, "Um wie viel Uhr? Schreib zum Beispiel '18 Uhr'.")
+            await self.save_session(message, key, history, current_topic, question)
+            return True
+        async with self.db.acquire() as conn:
+            async with conn.transaction():
+                count = await conn.fetchval("""SELECT count(*) FROM reminders WHERE guild_id=$1 AND user_id=$2
+                    AND status='pending'""", message.guild.id, message.author.id)
+                if count >= 10:
+                    await self.reply(message, "Zehn Erinnerungen reichen. Lösch erst eine, du Terminsammler.")
+                    await self.save_session(message, key, history, current_topic)
+                    return True
+                reminder_id = await conn.fetchval("""INSERT INTO reminders
+                    (guild_id, channel_id, user_id, reminder_text, due_at, next_attempt_at)
+                    VALUES ($1,$2,$3,$4,$5,$5) RETURNING id""",
+                    message.guild.id, message.channel.id, message.author.id, parsed.text, parsed.due_at)
+        await self.reply(message, f"Steht drin: #{reminder_id} am {parsed.due_at.astimezone(REMINDER_TZ):%d.%m.%Y um %H:%M}. Ich meld mich.")
+        await self.save_session(message, key, history, current_topic)
+        return True
+
+    async def deliver_reminders(self):
+        await self.wait_until_ready()
+        while True:
+            try:
+                async with self.db.acquire() as conn:
+                    async with conn.transaction():
+                        rows = await conn.fetch("""SELECT id, guild_id, channel_id, user_id, reminder_text FROM reminders
+                            WHERE status='pending' AND due_at <= now() AND next_attempt_at <= now()
+                            ORDER BY due_at FOR UPDATE SKIP LOCKED LIMIT 20""")
+                        for row in rows:
+                            channel = self.get_channel(row["channel_id"])
+                            if not isinstance(channel, discord.TextChannel) or channel.guild.id != row["guild_id"]:
+                                log.warning("Reminder %s channel is no longer available", row["id"])
+                                await conn.execute("UPDATE reminders SET status='failed' WHERE id=$1", row["id"])
+                                continue
+                            try:
+                                await channel.send(f"<@{row['user_id']}> Erinnerung: {row['reminder_text']}",
+                                                   allowed_mentions=discord.AllowedMentions(users=[discord.Object(id=row['user_id'])]))
+                            except discord.Forbidden:
+                                log.exception("No permission to deliver reminder %s", row["id"])
+                                await conn.execute("UPDATE reminders SET status='failed' WHERE id=$1", row["id"])
+                            except discord.HTTPException:
+                                log.exception("Could not deliver reminder %s; retrying", row["id"])
+                                await conn.execute("UPDATE reminders SET next_attempt_at=now()+interval '1 minute' WHERE id=$1", row["id"])
+                            else:
+                                await conn.execute("UPDATE reminders SET status='delivered', delivered_at=now() WHERE id=$1", row["id"])
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("Reminder delivery failed")
+            await asyncio.sleep(10)
 
     async def memory_command(self, message, question):
         text = question.strip()
