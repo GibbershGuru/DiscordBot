@@ -4,7 +4,7 @@ Winston antwortet erst, wenn eine Nachricht seinen Namen enthält. Im selben Cha
 
 Sein Stil ist norddeutscher Kneipenschnack: erst eine kurze, hilfreiche Antwort, dann wenn es passt eine trockene und ziemlich freche Pointe. Er redet die Person nicht zusätzlich mit Namen an, weil die Discord-Antwort bereits eine Erwähnung enthält.
 Zusätzliche Erwähnungen am Anfang einer Modellantwort werden entfernt. Fragen nach Winstons eigener Technik, Herkunft oder Version beantwortet er mit einem Kneipenspruch statt mit Angaben zu seinem Innenleben.
-Winston nutzt keine Websuche. Bei Fragen nach aktuellen Veröffentlichungen, Terminen, Neuigkeiten oder heutigen Amtsinhabern sagt er in seinem Kneipenstil, dass er es nicht verlässlich weiß; auch direkte Nachfragen und Korrekturen dazu beantwortet er vorsichtig. Dafür ruft er die OpenAI API nicht auf. Er nennt keine geratenen Daten oder Namen und verlinkt keine Quellen. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
+Winston nutzt keine Websuche. Bei erkannten Fragen nach aktuellen Veröffentlichungen, Terminen, Neuigkeiten oder wechselnden Amtsinhabern antwortet er schlicht „Weiß ich nicht sicher.“; auch direkte Nachfragen dazu beantwortet er so. Dafür ruft er die OpenAI API nicht auf. Bei anderen Fragen soll er Wissenslücken ebenfalls offen zugeben statt zu raten. Ohne Recherche lässt sich das bei frei formulierten Modellantworten nicht vollständig garantieren. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
 
 ## Inbetriebnahme auf Unraid
 
