@@ -83,6 +83,11 @@ class Winston(discord.Client):
             question = TRIGGER.sub("", content, count=1).strip(" ,:!?\n") if triggered else content.strip()
             if not question:
                 await self.reply(message, "Ja? Was gibt's?")
+                deadline = time.time() + TIMEOUT
+                data = {"history": session["history"] if session else [], "deadline": deadline,
+                        "guild": message.guild.id, "channel": message.channel.id, "user": message.author.id}
+                await self.redis.set(key, json.dumps(data), ex=TIMEOUT + 120)
+                await self.redis.zadd("session_deadlines", {key: deadline})
                 return
             if await self.memory_command(message, question):
                 return
@@ -172,7 +177,6 @@ class Winston(discord.Client):
                                                        allowed_mentions=discord.AllowedMentions(users=True))
                                 except discord.HTTPException:
                                     log.exception("Could not send farewell")
-                    self.locks.pop(key, None)
             except asyncio.CancelledError:
                 raise
             except Exception:
