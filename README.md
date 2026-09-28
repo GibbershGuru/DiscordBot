@@ -8,6 +8,7 @@ Ein Discord-Bot mit frei wählbarem Namen und norddeutschem Kneipenhumor. Das fe
 - Antwortet kurz, trocken und gelegentlich arrogant; variiert Begrüßungen und kurze Abschiede.
 - Begrüßt neue Mitglieder auf Wunsch in einem festgelegten Kanal mit einem zufälligen Spruch.
 - Merkt sich Fakten nur auf ausdrücklichen Befehl: `merk dir: ...`, `was weißt du über mich?`, `vergiss alles`.
+- Speichert Erinnerungen für „in 10 Minuten“, „in 5 Tagen“ oder „am 27.12.2026 um 18 Uhr“. Fehlt bei „morgen“ oder einem Datum die Uhrzeit, fragt er nach. `meine Erinnerungen` zeigt offene Aufträge, `lösche Erinnerung 3` entfernt einen.
 - Nutzt keine Websuche. Bei erkannten Fragen nach aktuellen Fakten sagt er „Weiß ich nicht sicher.“; auch sonst soll er Wissenslücken zugeben. Modellantworten können trotzdem Fehler enthalten.
 
 ## Start mit Docker Compose
@@ -18,6 +19,8 @@ Ein Discord-Bot mit frei wählbarem Namen und norddeutschem Kneipenhumor. Das fe
 4. Starte `docker compose up -d`. Für Updates: `docker compose pull && docker compose up -d`.
 
 `compose.yaml` startet den Bot mit PostgreSQL für ausdrücklich gespeicherte Erinnerungen und Redis für laufende Gespräche. Sichere das PostgreSQL-Volume regelmäßig. Du kannst den Bot auch über Docker-Oberflächen wie Unraid als einzelnen Container starten; dann benötigt er zusätzlich `DATABASE_URL` und `REDIS_URL` für erreichbare PostgreSQL- und Redis-Dienste. Alle Einstellungen lassen sich als Umgebungsvariablen übergeben, eine `.env`-Datei ist dabei nicht nötig.
+
+Erinnerungen liegen in PostgreSQL und werden nach einem Neustart nachgeholt, sofern der Bot im ursprünglichen Kanal noch schreiben kann. Standard-Zeitzone ist `Europe/Berlin`; mit `REMINDER_TIMEZONE` lässt sie sich ändern. Der Bot erwähnt die Person im ursprünglichen Kanal. Bis zu zehn offene Erinnerungen pro Person und Server sind möglich, höchstens ein Jahr im Voraus. Erinnerungen werden ohne OpenAI-Aufruf verarbeitet.
 
 Für automatische Begrüßungen: Im Discord Developer Portal zusätzlich **Server Members Intent** aktivieren und `WELCOME_CHANNEL_ID` auf die ID des gewünschten Textkanals setzen. Der Bot braucht dort **Kanal anzeigen** und **Nachrichten senden**. `WELCOME_CHANNEL_ID=0` (Standard) deaktiviert die Funktion; dann ist der zusätzliche Intent nicht erforderlich. Ein erneutes Einladen des Bots ist nicht nötig.
 
