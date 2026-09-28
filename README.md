@@ -4,7 +4,7 @@ Winston antwortet erst, wenn eine Nachricht seinen Namen enthält. Im selben Cha
 
 Sein Stil ist norddeutscher Kneipenschnack: erst eine kurze, hilfreiche Antwort, dann wenn es passt eine trockene und ziemlich freche Pointe. Er redet die Person nicht zusätzlich mit Namen an, weil die Discord-Antwort bereits eine Erwähnung enthält.
 Zusätzliche Erwähnungen am Anfang einer Modellantwort werden entfernt. Fragen nach Winstons eigener Technik, Herkunft oder Version beantwortet er mit einem Kneipenspruch statt mit Angaben zu seinem Innenleben.
-Bei aktuellen Fragen wie „Wann erscheint Enshrouded 1.0?“, „Was gibt es Neues von WoW Forever?“ oder einer ausdrücklichen Bitte um Recherche nutzt Winston die Websuche und verlinkt höchstens eine Quelle in Discord. Bei Enshrouded und World of Warcraft bittet er um die offiziellen Herstellerseiten und gibt eine Antwort nur aus, wenn die zitierte Quelle tatsächlich von einer dieser Seiten stammt, auch bei Folgefragen zum selben Spiel. Ohne zitierte offizielle Quelle zu diesen Spielen nennt er keinen vermeintlichen Termin. Ein einzelner Link kürzt die Antwort, spart aber keine Suchanfrage. Die Websuche ist standardmäßig aktiv und kann mit `WEB_SEARCH=false` deaktiviert werden; dann beantwortet Winston keine aktuellen Terminfragen. Suchanfragen kosten zusätzlich Geld und können länger dauern. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
+Winston nutzt keine Websuche. Bei Fragen nach aktuellen Veröffentlichungen, Terminen oder Neuigkeiten sagt er in seinem Kneipenstil, dass er es nicht weiß; dafür ruft er die OpenAI API nicht auf. Er nennt keine geratenen Daten und verlinkt keine Quellen. Ein „Tschüss“, „Ciao“, „Bis später“ oder ähnlicher eigener Abschied beendet die Sitzung sofort; eine fremde Nachricht mit demselben Text eröffnet danach kein Gespräch mehr.
 
 ## Inbetriebnahme auf Unraid
 
@@ -53,6 +53,6 @@ docker compose up --build -d
 docker compose logs -f bot
 ```
 
-Konfiguration: `BOT_NAME` (Trigger), `OPENAI_MODEL` (Standard `gpt-4.1-mini`), `MAX_OUTPUT_TOKENS` (Standard 120; bei Suche mindestens 240), `SESSION_SECONDS` (Standard 300), `WEB_SEARCH` (Standard `true`), `DISCORD_TOKEN`, `OPENAI_API_KEY`, `POSTGRES_PASSWORD`. Der Token-Deckel begrenzt die *Ausgabe je Anfrage*, nicht die gesamten API-Ausgaben. Keine automatische Kostengarantie: Setze zusätzlich ein Budget im OpenAI Dashboard. Bei Unraid „Add Container“ `WEB_SEARCH` als Umgebungsvariable eintragen, wenn du die Suche abschalten willst; andernfalls ist keine neue Variable nötig.
+Konfiguration: `BOT_NAME` (Trigger), `OPENAI_MODEL` (Standard `gpt-4.1-mini`), `MAX_OUTPUT_TOKENS` (Standard 120), `SESSION_SECONDS` (Standard 300), `DISCORD_TOKEN`, `OPENAI_API_KEY`, `POSTGRES_PASSWORD`. Der Token-Deckel begrenzt die *Ausgabe je Anfrage*, nicht die gesamten API-Ausgaben. Keine automatische Kostengarantie: Setze zusätzlich ein Budget im OpenAI Dashboard. Eine alte `WEB_SEARCH`-Variable in Unraid hat keine Wirkung mehr und kann entfernt werden.
 
 Lizenz: MIT (siehe `LICENSE`).
