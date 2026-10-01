@@ -50,7 +50,7 @@ def cache_date(question, history, local_date):
     relative = r"\b(?:heute\w*|morgen|morgige\w*|gestern|gestrige\w*|übermorgen|vorgestern|" \
                r"today|tomorrow|yesterday|tonight|" \
                r"(?:diese\w*|nächste\w*|letzte\w*|kommende\w*)\s+(?:woche|monat|jahr|wochenende|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)|" \
-               r"am\s+wochenende|in\s+(?:\d+|einem?|zwei|drei|vier|fünf|sechs|sieben)\s+(?:tagen?|wochen?|monaten?|jahren?)|" \
+               r"am\s+wochenende|in\s+(?:\d+|einem?|zwei|drei|vier|fünf|sechs|sieben)\s+(?:tag(?:en?)?|wochen?|monat(?:en?)?|jahr(?:en?)?)|" \
                r"(?:this|next|last)\s+(?:week|month|year|weekend))\b"
     return local_date.isoformat() if re.search(relative, text, re.IGNORECASE) else None
 

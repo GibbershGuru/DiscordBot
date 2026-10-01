@@ -250,6 +250,7 @@ class CacheTests(unittest.IsolatedAsyncioTestCase):
             ('Was erscheint morgen?', []),
             ('Was passiert nächste Woche?', []),
             ('Was erscheint in 3 Tagen?', []),
+            ('Was erscheint in einem Tag?', []),
             ('Was erscheint nächsten Freitag?', []),
             ('Und in Berlin?', [{'role':'user','content':'Wie wird morgen das Wetter?'}]),
         ]:
@@ -259,7 +260,7 @@ class CacheTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(ctx2['date'], '2026-10-02')
             await self.cache.answer(1, question, ctx1, self.generate)
             await self.cache.answer(1, question, ctx2, self.generate)
-        self.assertEqual(self.generate.await_count, 12)
+        self.assertEqual(self.generate.await_count, 14)
         self.assertIsNone(cache_date('Wann erscheint das Spiel?', [], day1))
         self.assertIsNone(cache_date('Release am 27.12.2026?', [], day1))
 
