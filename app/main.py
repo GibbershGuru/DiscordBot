@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from discord import app_commands
 from .modules import ModuleSettings, admin_commands
+from .management import ServerManager, register_commands
 from .search import SearchCache, cache_date, standalone_lookup, search_options, cited_answer
 
 import asyncpg
@@ -134,7 +135,7 @@ class Winston(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
-        intents.members = bool(WELCOME_CHANNEL_ID)
+        intents.members = bool(WELCOME_CHANNEL_ID) or os.getenv("MEMBER_EVENTS_ENABLED", "false").lower() in ("true", "1", "yes")
         super().__init__(intents=intents, allowed_mentions=discord.AllowedMentions.none())
         self.redis = Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
         self.ai = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=30.0)
@@ -144,7 +145,10 @@ class Winston(discord.Client):
         self.reminder_task = None
         self.modules = None
         self.tree = app_commands.CommandTree(self)
-        self.tree.add_command(admin_commands(self, NAME, OWNER_IDS))
+        self.manager = ServerManager(self)
+        group = admin_commands(self, NAME, OWNER_IDS)
+        register_commands(group, self, OWNER_IDS)
+        self.tree.add_command(group)
 
     async def setup_hook(self):
         self.db = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=3)
@@ -165,6 +169,7 @@ class Winston(discord.Client):
         await self.db.execute("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS delivery_text TEXT")
         self.modules = ModuleSettings(self.db)
         await self.modules.setup()
+        await self.manager.setup()
         self.search_cache = SearchCache(self.db, SEARCH_CACHE_SECONDS)
         await self.search_cache.setup()
         try:
@@ -198,6 +203,10 @@ class Winston(discord.Client):
         await self.redis.zadd("session_deadlines", {key: deadline})
 
     async def on_member_join(self, member):
+        try:
+            await self.manager.on_join(member)
+        except Exception:
+            log.exception("Join role processing failed")
         if not WELCOME_CHANNEL_ID or member.bot:
             return
         channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
