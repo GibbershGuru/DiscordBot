@@ -5,7 +5,7 @@ from typing import Literal
 import discord
 from discord import app_commands
 
-DEFAULTS = {"reminder": True, "search": False, "roles": False, "moderation": False, "modlog": False}
+DEFAULTS = {"reminder": True, "search": False, "roles": False, "moderation": False, "modlog": False, "profile": True}
 
 
 def command_name(name):

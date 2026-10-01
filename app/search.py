@@ -66,6 +66,7 @@ class SearchCache:
             guild_id BIGINT NOT NULL, cache_key TEXT NOT NULL, question TEXT NOT NULL,
             answer TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL,
             PRIMARY KEY (guild_id,cache_key))""")
+        await self.pool.execute("ALTER TABLE search_cache ADD COLUMN IF NOT EXISTS user_id BIGINT")
         await self.pool.execute("CREATE INDEX IF NOT EXISTS search_cache_expiry_idx ON search_cache (expires_at)")
 
     async def answer(self, guild_id, question, context, generate):
@@ -84,8 +85,8 @@ class SearchCache:
                 answer = await generate()
                 if re.search(r"\]\(<https?://", answer):
                     await conn.execute("DELETE FROM search_cache WHERE guild_id=$1 AND expires_at<=now()", guild_id)
-                    await conn.execute("""INSERT INTO search_cache (guild_id,cache_key,question,answer,expires_at)
-                        VALUES ($1,$2,$3,$4,now()+$5*interval '1 second')
+                    await conn.execute("""INSERT INTO search_cache (guild_id,cache_key,question,answer,user_id,expires_at)
+                        VALUES ($1,$2,$3,$4,$6,now()+$5*interval '1 second')
                         ON CONFLICT (guild_id,cache_key) DO UPDATE SET question=EXCLUDED.question,
-                        answer=EXCLUDED.answer,expires_at=EXCLUDED.expires_at""", guild_id, cache_key, question[:1500], answer, float(self.ttl))
+                        answer=EXCLUDED.answer,user_id=EXCLUDED.user_id,expires_at=EXCLUDED.expires_at""", guild_id, cache_key, question[:1500], answer, float(self.ttl), context.get("user"))
                 return answer

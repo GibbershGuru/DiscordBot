@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from app.management import ServerManager, register_commands, role_error, target_error
 from app.modules import admin_commands
+from app.profiles import register_profile_commands
 
 
 class Role:
@@ -31,6 +32,7 @@ def fixture():
     interaction = NS(user=actor, guild=guild, guild_id=1, response=NS(defer=AsyncMock(), send_message=AsyncMock()), followup=NS(send=AsyncMock()))
     group = admin_commands(bot, 'Hein', {2})
     register_commands(group, bot, {2})
+    register_profile_commands(group, bot, {2})
     return guild, actor, target, bot, interaction, group
 
 
@@ -73,7 +75,7 @@ class HierarchyTests(unittest.TestCase):
         tree.add_command(group)
         payload = group.to_dict(tree)
         self.assertEqual(payload['name'], 'hein')
-        self.assertEqual(len(payload['options']), 14)
+        self.assertEqual(len(payload['options']), 16)
 
 
 class CommandTests(unittest.IsolatedAsyncioTestCase):

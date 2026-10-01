@@ -185,7 +185,7 @@ class CacheTests(unittest.IsolatedAsyncioTestCase):
                 return entry[0] if entry and entry[1] > self.pool.now else None
             async def execute(self, sql, *args):
                 if sql.startswith('INSERT'):
-                    guild, key, question, answer, ttl = args
+                    guild, key, question, answer, ttl, user_id = args
                     self.pool.entries[(guild,key)] = (answer, self.pool.now + ttl)
                 if sql.startswith('DELETE'):
                     self.pool.entries = {key: value for key,value in self.pool.entries.items() if value[1] > self.pool.now or key[0] != args[0]}
