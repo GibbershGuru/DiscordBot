@@ -228,6 +228,41 @@ class CacheTests(unittest.IsolatedAsyncioTestCase):
         await self.cache.answer(1, 'Andere Frage?', {}, self.generate)
         self.assertEqual(self.generate.await_count, 3)
 
+    async def test_24_hours_survive_midnight(self):
+        from app.search import SearchCache, cache_date
+        from datetime import date
+        cache = SearchCache(self.pool, 86400)
+        q = 'Wann erscheint Enshrouded 1.0?'
+        await cache.answer(1, q, {'date': cache_date(q, [], date(2026, 10, 1))}, self.generate)
+        self.pool.now = 7200
+        await cache.answer(1, q, {'date': cache_date(q, [], date(2026, 10, 2))}, self.generate)
+        self.generate.assert_awaited_once()
+        self.pool.now = 86401
+        await cache.answer(1, q, {'date': cache_date(q, [], date(2026, 10, 2))}, self.generate)
+        self.assertEqual(self.generate.await_count, 2)
+
+    async def test_relative_dates_and_followups_change_at_midnight(self):
+        from app.search import cache_date
+        from datetime import date
+        day1, day2 = date(2026, 10, 1), date(2026, 10, 2)
+        for question, history in [
+            ('Wie wird das Wetter heute?', []),
+            ('Was erscheint morgen?', []),
+            ('Was passiert nächste Woche?', []),
+            ('Was erscheint in 3 Tagen?', []),
+            ('Was erscheint nächsten Freitag?', []),
+            ('Und in Berlin?', [{'role':'user','content':'Wie wird morgen das Wetter?'}]),
+        ]:
+            ctx1 = {'date': cache_date(question, history, day1)}
+            ctx2 = {'date': cache_date(question, history, day2)}
+            self.assertEqual(ctx1['date'], '2026-10-01')
+            self.assertEqual(ctx2['date'], '2026-10-02')
+            await self.cache.answer(1, question, ctx1, self.generate)
+            await self.cache.answer(1, question, ctx2, self.generate)
+        self.assertEqual(self.generate.await_count, 12)
+        self.assertIsNone(cache_date('Wann erscheint das Spiel?', [], day1))
+        self.assertIsNone(cache_date('Release am 27.12.2026?', [], day1))
+
     async def test_standalone_detection(self):
         from app.search import standalone_lookup
         self.assertTrue(standalone_lookup('Wann erscheint Enshrouded 1.0?'))

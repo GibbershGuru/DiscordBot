@@ -44,6 +44,17 @@ def standalone_lookup(question):
                          r"wer\s+(?:ist|heißt)\s+(?:(?:der|die)\s+)?(?:bundeskanzler(?:in)?|bundespräsident(?:in)?|papst)\b)", text))
 
 
+def cache_date(question, history, local_date):
+    """Only calendar-relative requests need a new cache key after midnight."""
+    text = " ".join([question] + [item.get("content", "") for item in history if item.get("role") == "user"])
+    relative = r"\b(?:heute\w*|morgen|morgige\w*|gestern|gestrige\w*|übermorgen|vorgestern|" \
+               r"today|tomorrow|yesterday|tonight|" \
+               r"(?:diese\w*|nächste\w*|letzte\w*|kommende\w*)\s+(?:woche|monat|jahr|wochenende|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)|" \
+               r"am\s+wochenende|in\s+(?:\d+|einem?|zwei|drei|vier|fünf|sechs|sieben)\s+(?:tagen?|wochen?|monaten?|jahren?)|" \
+               r"(?:this|next|last)\s+(?:week|month|year|weekend))\b"
+    return local_date.isoformat() if re.search(relative, text, re.IGNORECASE) else None
+
+
 class SearchCache:
     """PostgreSQL cache, isolated by server and exact request context."""
     def __init__(self, pool, ttl=3600):

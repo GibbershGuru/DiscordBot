@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from discord import app_commands
 from .modules import ModuleSettings, admin_commands
-from .search import SearchCache, standalone_lookup, search_options, cited_answer
+from .search import SearchCache, cache_date, standalone_lookup, search_options, cited_answer
 
 import asyncpg
 import discord
@@ -293,7 +293,7 @@ class Winston(discord.Client):
                                 search_instructions = instructions.split("Gespeicherte Fakten: ", 1)[0] + "Nutze die Websuche und belege aktuelle Fakten mit Quellen."
                                 search_input = [{"role": "user", "content": question[:1500]}]
                             context = {"model": MODEL, "instructions": search_instructions,
-                                       "date": datetime.now(REMINDER_TZ).date().isoformat(),
+                                       "date": cache_date(question, [] if shared else history, datetime.now(REMINDER_TZ).date()),
                                        "tokens": max(OUTPUT_TOKENS, 300),
                                        "history": [] if shared else history,
                                        "user": None if shared else message.author.id}
