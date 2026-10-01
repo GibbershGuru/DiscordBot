@@ -5,7 +5,7 @@ Ein Discord-Bot mit frei wählbarem Namen und norddeutschem Kneipenhumor. Das fe
 ## Funktionen
 
 - Reagiert auf seinen Namen (`BOT_NAME`) und unterhält sich danach pro Person und Kanal bis zu fünf Minuten ohne erneutes Aufrufen.
-- Antwortet kurz, trocken und gelegentlich arrogant; variiert Begrüßungen und kurze Abschiede.
+- Antwortet kurz, trocken und gelegentlich arrogant; variiert Begrüßungen und kurze Abschiede und nutzt gelegentlich passende Standard-Emojis.
 - Begrüßt neue Mitglieder auf Wunsch in einem festgelegten Kanal mit einem zufälligen Spruch.
 - Merkt sich Fakten nur auf ausdrücklichen Befehl: `merk dir: ...`, `was weißt du über mich?`, `vergiss alles`.
 - Speichert Erinnerungen für „in 10 Minuten“, „in 5 Tagen“ oder „am 27.12.2026 um 18 Uhr“. Unterstützt auch „heute Abend“ und fragt nach fehlendem Tag oder Uhrzeit. Die KI formuliert beim Anlegen einen passenden Spruch. `meine Erinnerungen` zeigt offene Aufträge, `lösche Erinnerung 3` entfernt einen.
