@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from discord import app_commands
 from .modules import ModuleSettings, admin_commands
-from .search import search_options, cited_answer
+from .search import SearchCache, standalone_lookup, search_options, cited_answer
 
 import asyncpg
 import discord
@@ -27,6 +27,7 @@ TRIGGER = re.compile(r"(?<!\w)" + re.escape(NAME) + r"(?!\w)", re.IGNORECASE)
 TIMEOUT = max(30, int(os.getenv("SESSION_SECONDS", "300")))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 OUTPUT_TOKENS = max(32, min(300, int(os.getenv("MAX_OUTPUT_TOKENS", "120"))))
+SEARCH_CACHE_SECONDS = max(60, min(86400, int(os.getenv("SEARCH_CACHE_SECONDS", "3600"))))
 OWNER_IDS = {int(value.strip()) for value in os.getenv("BOT_OWNER_IDS", "").split(",") if value.strip()}
 REMINDER_TZ = ZoneInfo(os.getenv("REMINDER_TIMEZONE", "Europe/Berlin"))
 WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID", "0").strip() or "0")
@@ -164,6 +165,8 @@ class Winston(discord.Client):
         await self.db.execute("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS delivery_text TEXT")
         self.modules = ModuleSettings(self.db)
         await self.modules.setup()
+        self.search_cache = SearchCache(self.db, SEARCH_CACHE_SECONDS)
+        await self.search_cache.setup()
         try:
             await self.tree.sync()
         except discord.HTTPException:
@@ -275,13 +278,33 @@ class Winston(discord.Client):
             else:
                 try:
                     async with message.channel.typing():
-                        response = await self.ai.responses.create(
-                            model=MODEL, instructions=instructions,
-                            input=history + [{"role": "user", "content": question[:1500]}],
-                            max_output_tokens=max(OUTPUT_TOKENS, 300) if use_search else OUTPUT_TOKENS, store=False,
-                            **(search_options() if use_search else {}),
-                        )
-                    answer = without_repeated_name(cited_answer(response) if use_search else response.output_text.strip()[:1500], message.author)
+                        async def generate_search():
+                            result = await self.ai.responses.create(
+                                model=MODEL, instructions=search_instructions, input=search_input,
+                                max_output_tokens=max(OUTPUT_TOKENS, 300), store=False, **search_options())
+                            return cited_answer(result)
+
+                        if use_search:
+                            shared = standalone_lookup(question)
+                            search_instructions = instructions
+                            search_input = history + [{"role": "user", "content": question[:1500]}]
+                            if shared:
+                                # Public factual lookups do not need personal memories or chat history.
+                                search_instructions = instructions.split("Gespeicherte Fakten: ", 1)[0] + "Nutze die Websuche und belege aktuelle Fakten mit Quellen."
+                                search_input = [{"role": "user", "content": question[:1500]}]
+                            context = {"model": MODEL, "instructions": search_instructions,
+                                       "date": datetime.now(REMINDER_TZ).date().isoformat(),
+                                       "tokens": max(OUTPUT_TOKENS, 300),
+                                       "history": [] if shared else history,
+                                       "user": None if shared else message.author.id}
+                            raw_answer = await self.search_cache.answer(message.guild.id, question[:1500], context, generate_search)
+                        else:
+                            response = await self.ai.responses.create(
+                                model=MODEL, instructions=instructions,
+                                input=history + [{"role": "user", "content": question[:1500]}],
+                                max_output_tokens=OUTPUT_TOKENS, store=False)
+                            raw_answer = response.output_text.strip()[:1500]
+                    answer = without_repeated_name(raw_answer, message.author)
                     if re.search(r"\b(?:ich|mich|mein\w*)\b", answer, re.IGNORECASE) and re.search(
                         r"\b(?:openai|chatgpt|gpt(?:[- ]?\d[\w.-]*)?|sprachmodell|ki-modell|api)\b", answer, re.IGNORECASE
                     ):

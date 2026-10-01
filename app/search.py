@@ -32,3 +32,49 @@ def cited_answer(response):
     if len(answer) > 1750:
         return "Die Recherche war zu umfangreich. Frag bitte etwas gezielter."
     return answer
+
+
+def standalone_lookup(question):
+    """Only share explicit, self-contained factual questions across users."""
+    text = question.casefold().strip(' .!?')
+    if re.search(r"\b(?:ich|mich|mir|mein\w*|dein\w*|du|dich|hier|dort|dies\w*|das|er|sie|es)\b", text.replace('was gibt es neues', 'neuigkeiten')):
+        return False
+    return bool(re.match(r"^(?:wann\s+(?:kommt|erscheint|startet|beginnt)\s+\S+|"
+                         r"was gibt es neues\s+(?:von|zu|über)\s+\S+|"
+                         r"wer\s+(?:ist|heißt)\s+(?:(?:der|die)\s+)?(?:bundeskanzler(?:in)?|bundespräsident(?:in)?|papst)\b)", text))
+
+
+class SearchCache:
+    """PostgreSQL cache, isolated by server and exact request context."""
+    def __init__(self, pool, ttl=3600):
+        self.pool = pool
+        self.ttl = max(60, min(86400, ttl))
+
+    async def setup(self):
+        await self.pool.execute("""CREATE TABLE IF NOT EXISTS search_cache (
+            guild_id BIGINT NOT NULL, cache_key TEXT NOT NULL, question TEXT NOT NULL,
+            answer TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (guild_id,cache_key))""")
+        await self.pool.execute("CREATE INDEX IF NOT EXISTS search_cache_expiry_idx ON search_cache (expires_at)")
+
+    async def answer(self, guild_id, question, context, generate):
+        import hashlib
+        import json
+        import unicodedata
+        normalized = ' '.join(unicodedata.normalize('NFKC', question).casefold().split()).rstrip(' .!?')
+        cache_key = hashlib.sha256(json.dumps(["search-cache-v1", self.ttl, normalized, context], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                # Concurrent identical requests wait, then reuse the first result.
+                await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", f"search:{guild_id}:{cache_key}")
+                cached = await conn.fetchval("SELECT answer FROM search_cache WHERE guild_id=$1 AND cache_key=$2 AND expires_at>now()", guild_id, cache_key)
+                if cached is not None:
+                    return cached
+                answer = await generate()
+                if re.search(r"\]\(<https?://", answer):
+                    await conn.execute("DELETE FROM search_cache WHERE guild_id=$1 AND expires_at<=now()", guild_id)
+                    await conn.execute("""INSERT INTO search_cache (guild_id,cache_key,question,answer,expires_at)
+                        VALUES ($1,$2,$3,$4,now()+$5*interval '1 second')
+                        ON CONFLICT (guild_id,cache_key) DO UPDATE SET question=EXCLUDED.question,
+                        answer=EXCLUDED.answer,expires_at=EXCLUDED.expires_at""", guild_id, cache_key, question[:1500], answer, float(self.ttl))
+                return answer

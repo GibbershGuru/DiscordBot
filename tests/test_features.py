@@ -168,5 +168,72 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.send.call_args.args[0], '<@3> Ab unter die Dusche. Die Seife wartet.')
         self.assertIn("status='delivered'", conn.execute.call_args.args[0])
 
+class CacheTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from app.search import SearchCache
+        class Conn:
+            def __init__(self, pool):
+                self.pool = pool
+            def transaction(self): return self
+            async def __aenter__(self):
+                await self.pool.lock.acquire()
+                return self
+            async def __aexit__(self, *args):
+                self.pool.lock.release()
+            async def fetchval(self, sql, guild, key):
+                entry = self.pool.entries.get((guild, key))
+                return entry[0] if entry and entry[1] > self.pool.now else None
+            async def execute(self, sql, *args):
+                if sql.startswith('INSERT'):
+                    guild, key, question, answer, ttl = args
+                    self.pool.entries[(guild,key)] = (answer, self.pool.now + ttl)
+                if sql.startswith('DELETE'):
+                    self.pool.entries = {key: value for key,value in self.pool.entries.items() if value[1] > self.pool.now or key[0] != args[0]}
+        class Context:
+            async def __aenter__(self): return self.conn
+            async def __aexit__(self, *args): pass
+        class Pool:
+            def __init__(self):
+                self.entries = {}; self.now = 0; self.lock = asyncio.Lock()
+            def acquire(self):
+                ctx = Context(); ctx.conn = Conn(self); return ctx
+        self.pool = Pool()
+        self.cache = SearchCache(self.pool, 3600)
+        self.generate = AsyncMock(return_value='Release am 1. Januar. [Quelle](<https://example.org/info>)')
+
+    async def test_repeat_normalization_restart_and_expiry(self):
+        from app.search import SearchCache
+        a = await self.cache.answer(1, 'Wann erscheint Enshrouded 1.0?', {'model':'mini'}, self.generate)
+        b = await SearchCache(self.pool).answer(1, '  wann erscheint ENSHROUDED 1.0! ', {'model':'mini'}, self.generate)
+        self.assertEqual(a, b)
+        self.generate.assert_awaited_once()
+        self.pool.now = 3601
+        await self.cache.answer(1, 'Wann erscheint Enshrouded 1.0?', {'model':'mini'}, self.generate)
+        self.assertEqual(self.generate.await_count, 2)
+
+    async def test_context_server_model_and_ttl_isolation(self):
+        from app.search import SearchCache
+        await self.cache.answer(1, 'Wann kommt es?', {'user': 1, 'history':['game A']}, self.generate)
+        await self.cache.answer(1, 'Wann kommt es?', {'user': 1, 'history':['game B']}, self.generate)
+        await self.cache.answer(2, 'Wann kommt es?', {'user': 1, 'history':['game A']}, self.generate)
+        await self.cache.answer(1, 'Wann kommt es?', {'user': 2, 'history':['game A']}, self.generate)
+        await SearchCache(self.pool, 60).answer(1, 'Wann kommt es?', {'user': 1, 'history':['game A']}, self.generate)
+        self.assertEqual(self.generate.await_count, 5)
+
+    async def test_parallel_requests_and_uncertain_answers(self):
+        await asyncio.gather(*(self.cache.answer(1, 'release?', {}, self.generate) for _ in range(4)))
+        self.generate.assert_awaited_once()
+        self.generate.return_value = 'Weiß ich nicht sicher.'
+        await self.cache.answer(1, 'Andere Frage?', {}, self.generate)
+        await self.cache.answer(1, 'Andere Frage?', {}, self.generate)
+        self.assertEqual(self.generate.await_count, 3)
+
+    async def test_standalone_detection(self):
+        from app.search import standalone_lookup
+        self.assertTrue(standalone_lookup('Wann erscheint Enshrouded 1.0?'))
+        self.assertTrue(standalone_lookup('Was gibt es Neues von WoW Forever?'))
+        self.assertFalse(standalone_lookup('Und wann kommt das?'))
+        self.assertFalse(standalone_lookup('Wann kommt meine Lieferung?'))
+
 if __name__ == '__main__':
     unittest.main()
