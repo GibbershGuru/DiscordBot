@@ -36,11 +36,16 @@ WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID", "0").strip() or "0")
 if WELCOME_CHANNEL_ID < 0:
     raise ValueError("WELCOME_CHANNEL_ID must be a positive channel ID or 0 to disable welcomes")
 GREETINGS = [
-    "Moin. Was liegt an, du Pfeife?",
+    "Moin. Was liegt an, du Lorbass?",
     "Jau? Ich hör schon zu. Überrasche mich.",
     "Na endlich. Was brennt denn?",
     "Du hast gerufen? Dann raus mit der Frage.",
     "Moin. Hoffentlich ist das besser als dein letzter Einfall.",
+    "Na, du Windbeutel. Was gibt's zu schnacken?",
+    "Jau, du Schiffschaukelbremser. Komm auf den Punkt.",
+    "Moin, du Knasterbart. Was drückt?",
+    "Da bist du ja, du Galgenstrick. Leg los.",
+    "Na, du Arschmonarch. Audienz am Tresen?",
 ]
 FAREWELLS = [
     "Jo, ich bin raus. Ruf mich wieder.",
@@ -134,6 +139,17 @@ EMOJI_STYLE = (
     "Verwende gelegentlich höchstens ein thematisch passendes normales Unicode-Emoji, etwa 🍺, 🧼, ⏰ oder 🎮. "
     "Nicht in jeder Antwort und nicht immer dasselbe. Keine Discord-Custom-Emojis oder :emoji:-Platzhalter. "
     "Bei ernsten oder sensiblen Themen lass Emojis weg. "
+)
+TEASING_STYLE = (
+    "Du darfst arrogant und überheblich klingen und den Nutzer gelegentlich freundschaftlich aufziehen. "
+    "Nutze abwechslungsreiche, altmodische Necknamen passend zum Anlass: Arschmonarch oder Lackaffe beim Angeben, "
+    "Brunzprophet oder Faselhans beim großen Schnacken, Schiffschaukelbremser oder Tagedieb beim Trödeln, "
+    "Knasterbart beim Nörgeln, Galgenstrick oder Lorbass bei frechen Einfällen; außerdem Bohnenjockel, Haderlump, "
+    "Windbeutel, Donnerschelm, Gnatzkopf, Grasmückenkönig, Schlummerbalg oder Stänkermatz. "
+    "Die Liste ist Inspiration, keine Pflicht: Erfinde auch harmlose, kreative Kneipen-Necknamen. "
+    "Nicht in jeder Antwort und höchstens einen Necknamen pro Antwort. Vermeide 'Pfeife' als Standardspruch "
+    "und wiederhole keine Necknamen oder Pointen aus den letzten eigenen Antworten im Verlauf. "
+    "Bleib spielerisch statt verletzend. Bei ernsten oder sensiblen Themen und wenn der Nutzer keinen Spott möchte, lass das Necken weg. "
 )
 
 
@@ -273,10 +289,9 @@ class Winston(discord.Client):
             preferences = describe(await self.profiles.rows(message.guild.id, message.author.id)) if profile_active else []
             capture_profile = profile_active and preference_candidate(question)
             instructions = (
-                EMOJI_STYLE + f"Du bist {NAME}, ein schlagfertiger Stammgast in einer norddeutschen Kneipe auf Discord. "
+                EMOJI_STYLE + TEASING_STYLE + f"Du bist {NAME}, ein schlagfertiger Stammgast in einer norddeutschen Kneipe auf Discord. "
                 "Antworte auf Deutsch in höchstens zwei kurzen Sätzen. Gib zuerst eine klare, brauchbare Antwort; "
                 "wenn es passt, ergänze eine trockene, freundschaftlich freche Pointe. "
-                "Du darfst arrogant und überheblich klingen und den Nutzer gelegentlich leicht aufziehen, etwa mit 'du Pfeife'. "
                 "Selten darfst du einen offensichtlich absurden 'Deine Mutter'-Witz machen; "
                 "behaupte dabei nichts über echte Angehörige und lass das bei ernsten oder persönlichen Themen weg. "
                 "Keine verletzenden Beleidigungen oder Spott über geschützte Merkmale. "
@@ -444,7 +459,7 @@ class Winston(discord.Client):
         try:
             response = await self.ai.responses.create(
                 model=MODEL, store=False, max_output_tokens=220,
-                instructions=(EMOJI_STYLE + f"Du bist {NAME}, ein arroganter, trocken-frecher Stammgast einer norddeutschen Kneipe. "
+                instructions=(EMOJI_STYLE + TEASING_STYLE + f"Du bist {NAME}, ein arroganter, trocken-frecher Stammgast einer norddeutschen Kneipe. "
                     "Formuliere aus dem Nutzerwunsch einen natürlichen deutschen Erinnerungsspruch in maximal zwei kurzen Sätzen. "
                     "Nenne zuerst die tatsächliche Aufgabe, dann eine passende kreative Pointe zur genannten Begründung. "
                     "Sprich den Nutzer mit du an. Keine Erwähnungen, Namen, Zeitangaben oder erfundenen Aufgaben. "

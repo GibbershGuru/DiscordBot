@@ -61,7 +61,9 @@ def reminder_message(text):
     else:
         sentence = "Denk dran: " + task[:1].lower() + task[1:]
     return sentence.rstrip(".!?") + ". " + random.choice([
-        "Nu mach hin, du Pfeife.",
+        "Nu mach hin, du Schiffschaukelbremser.",
+        "Auf die Hufe, du Tagedieb.",
+        "Dein Auftritt, du Galgenstrick.",
         "Ich hab Bescheid gesagt. Der Rest liegt bei dir.",
         "Mehr Service gibt's hier nur gegen Trinkgeld.",
     ])
